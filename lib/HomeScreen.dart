@@ -36,7 +36,6 @@ class _HomePageState extends State<HomePage> {
 
   final ScrollController scrollController = ScrollController();
   final TextEditingController controller = TextEditingController();
-  final ImagePicker _picker = ImagePicker(); // Image picker instance
 
   @override
   void initState() {
@@ -184,14 +183,103 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Drawer(
-
-      ),
+      drawer: _drawer(),
         appBar: AppBar(
           title: const Text('Ask Gemini'),
-          backgroundColor: Colors.blue,
+          backgroundColor: Colors.blueAccent,
         ),
         body:  _builtUI()
+    );
+  }
+
+  Widget _drawer(){
+    return  Drawer(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Material(
+              color: Colors.blueAccent,
+              child: InkWell(
+                onTap: (){
+                  Navigator.pop(context);
+               //   Navigator.push(context, MaterialPageRoute(builder: (context) => UserProfile()),);
+                },
+                child: Container(
+                  padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top,
+                      bottom: 24
+                  ),
+                  child: const Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 52,
+                        backgroundImage: NetworkImage(
+                            "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"
+                        ),
+                      ),
+                      SizedBox(height: 12,),
+                      Text('Ask Gemini',
+                        style: TextStyle(
+                            fontSize: 28,
+                            color: Colors.white
+                        ),),
+                      Text('',
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white
+                        ),),
+
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.home_outlined),
+                  title: Text('New Chat'),
+                  onTap: (){
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => HomePage()),);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.favorite_border),
+                  title: Text('Favourites'),
+                  onTap: (){
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => FavouriteScreen()),);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.workspaces),
+                  title: Text('Workflow'),
+                  onTap: (){},
+                ),
+                ListTile(
+                  leading: Icon(Icons.update),
+                  title: Text('History'),
+                  onTap: (){},
+                ),
+                const Divider(color: Colors.black45,),
+                ListTile(
+                  leading: Icon(Icons.account_tree_outlined),
+                  title: Text('Plugins'),
+                  onTap: (){},
+                ),
+                ListTile(
+                  leading: Icon(Icons.notifications_outlined),
+                  title: Text('Notifications'),
+                  onTap: (){},
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
     );
   }
 
@@ -329,3 +417,18 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
+class FavouriteScreen extends StatefulWidget {
+  const FavouriteScreen({super.key});
+
+  @override
+  State<FavouriteScreen> createState() => _FavouriteScreenState();
+}
+
+class _FavouriteScreenState extends State<FavouriteScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return const Placeholder();
+  }
+}
+
