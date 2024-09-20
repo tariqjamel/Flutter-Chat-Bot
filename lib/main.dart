@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_chatbot/const.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
 
-import 'HomeScreen.dart';
+import 'HomePage.dart';
 
 void main(){
   Gemini.init(apiKey: GEMINI_API_KEY);

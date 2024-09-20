@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:chat_bubbles/bubbles/bubble_normal.dart';
@@ -9,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+
+import 'CustomLoader.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -186,7 +189,7 @@ class _HomePageState extends State<HomePage> {
       drawer: _drawer(),
         appBar: AppBar(
           title: const Text('Ask Gemini'),
-          backgroundColor: Colors.blueAccent,
+          backgroundColor: Colors.blue.shade100,
         ),
         body:  _builtUI()
     );
@@ -199,7 +202,7 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Material(
-              color: Colors.blueAccent,
+              color: Colors.blue.shade100,
               child: InkWell(
                 onTap: (){
                   Navigator.pop(context);
@@ -214,9 +217,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       CircleAvatar(
                         radius: 52,
-                        backgroundImage: NetworkImage(
-                            "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"
-                        ),
+                        backgroundImage: NetworkImage("https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"),
                       ),
                       SizedBox(height: 12,),
                       Text('Ask Gemini',
@@ -228,8 +229,8 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(
                             fontSize: 14,
                             color: Colors.white
-                        ),),
-
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -247,11 +248,11 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.favorite_border),
+                  leading: const Icon(Icons.favorite_border),
                   title: Text('Favourites'),
                   onTap: (){
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => FavouriteScreen()),);
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => CustomLoader()),);
                   },
                 ),
                 ListTile(
@@ -354,81 +355,79 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.all(8.0),
       child: Row(
         children: [
-          IconButton(
-            onPressed: _listen,
-            icon: const Icon(Icons.mic),
-          ),
-
-          IconButton(
-            icon: const Icon(Icons.photo),
-            onPressed: _sendMediaMessage,
-            color: Colors.blue,
-          ),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 1.0),
               decoration: BoxDecoration(
                 color: Colors.grey[200],
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: TextField(
-                controller: controller,
-                textCapitalization: TextCapitalization.sentences,
-                onSubmitted: (text) {
-                  if (text.isNotEmpty) {
-                    _sendMessage(ChatMessage(
-                      user: currentUser,
-                      createdAt: DateTime.now(),
-                      text: text,
-                    ));
-                  }
-                },
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: "Enter text",
-                ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.photo),
+                    onPressed: _sendMediaMessage,
+                    color: Colors.blue,
+                    constraints: BoxConstraints(),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      textCapitalization: TextCapitalization.sentences,
+                      onChanged: (text) {
+                        setState(() {});
+                      },
+                      onSubmitted: (text) {
+                        if (text.isNotEmpty) {
+                          _sendMessage(ChatMessage(
+                            user: currentUser,
+                            createdAt: DateTime.now(),
+                            text: text,
+                          ));
+                          controller.clear();
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "Enter text",
+                      ),
+                    ),
+                  ),
+                  VerticalDivider(color: Colors.black, width: 8),
+                  IconButton(
+                    onPressed: controller.text.isEmpty ? _listen : () {
+                      if (controller.text.isNotEmpty) {
+                        _sendMessage(ChatMessage(
+                          user: currentUser,
+                          createdAt: DateTime.now(),
+                          text: controller.text,
+                        ));
+                        controller.clear();
+                      }
+                    },
+                    icon: Icon(
+                      controller.text.isEmpty ? Icons.mic : Icons.send,
+                      color: Colors.blue,
+                      size: 22,
+                    ),
+                    constraints: BoxConstraints(),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: () {
-              if (controller.text.isNotEmpty) {
-                _sendMessage(ChatMessage(
-                  user: currentUser,
-                  createdAt: DateTime.now(),
-                  text: controller.text,
-                ));
-                controller.clear();
-              }
+          IconButton(
+            icon: const Icon(Icons.headset), // Headphone icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CustomLoader()),
+              );
             },
-            child: Container(
-              height: 40,
-              width: 40,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: const Icon(Icons.send, color: Colors.white),
-            ),
+            color: Colors.blue,
           ),
         ],
       ),
     );
   }
 }
-
-class FavouriteScreen extends StatefulWidget {
-  const FavouriteScreen({super.key});
-
-  @override
-  State<FavouriteScreen> createState() => _FavouriteScreenState();
-}
-
-class _FavouriteScreenState extends State<FavouriteScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return const Placeholder();
-  }
-}
-
