@@ -11,7 +11,8 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-import 'CustomLoader.dart';
+import 'VoiceChat.dart';
+import 'Waveform.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,8 +26,12 @@ class _HomePageState extends State<HomePage> {
   FlutterTts flutterTts = FlutterTts();
   List<ChatMessage> messages = [];
 
+  final ScrollController scrollController = ScrollController();
+  final TextEditingController controller = TextEditingController();
+
   late stt.SpeechToText speechToText;
   bool _isListening = false;
+  bool _isGenerating = false;
   bool isTyping = false;
   String _text = '';
   ChatUser currentUser = ChatUser(id: "0", firstName: "User");
@@ -36,9 +41,6 @@ class _HomePageState extends State<HomePage> {
     profileImage:
         "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png",
   );
-
-  final ScrollController scrollController = ScrollController();
-  final TextEditingController controller = TextEditingController();
 
   @override
   void initState() {
@@ -50,6 +52,12 @@ class _HomePageState extends State<HomePage> {
     flutterTts.setLanguage("en-US");
     flutterTts.setPitch(1.0);
     flutterTts.setSpeechRate(0.5);
+
+    flutterTts.setCompletionHandler(() {
+      setState(() {
+        _isGenerating = false;
+      });
+    });
   }
 
   @override
@@ -181,22 +189,25 @@ class _HomePageState extends State<HomePage> {
 
   void _readAloud(String message) async {
     await flutterTts.speak(message);
+    setState(() {
+      _isGenerating = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: _drawer(),
+        drawer: _drawerUI(),
         appBar: AppBar(
           title: const Text('Ask Gemini'),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 24),
           backgroundColor: Colors.blue.shade100,
         ),
-        body:  _builtUI()
-    );
+        body: _chatUI());
   }
 
-  Widget _drawer(){
-    return  Drawer(
+  Widget _drawerUI() {
+    return Drawer(
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -204,77 +215,82 @@ class _HomePageState extends State<HomePage> {
             Material(
               color: Colors.blue.shade100,
               child: InkWell(
-                onTap: (){
+                onTap: () {
                   Navigator.pop(context);
-               //   Navigator.push(context, MaterialPageRoute(builder: (context) => UserProfile()),);
+                  //   Navigator.push(context, MaterialPageRoute(builder: (context) => UserProfile()),);
                 },
                 child: Container(
                   padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top,
-                      bottom: 24
-                  ),
+                      top: MediaQuery.of(context).padding.top, bottom: 24),
                   child: const Column(
                     children: [
                       CircleAvatar(
                         radius: 52,
-                        backgroundImage: NetworkImage("https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"),
+                        backgroundImage: NetworkImage(
+                            "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"),
                       ),
-                      SizedBox(height: 12,),
-                      Text('Ask Gemini',
-                        style: TextStyle(
-                            fontSize: 28,
-                            color: Colors.white
-                        ),),
-                      Text('',
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white
-                        ),
+                      SizedBox(
+                        height: 12,
+                      ),
+                      Text(
+                        'Ask Gemini',
+                        style: TextStyle(fontSize: 28, color: Colors.white),
+                      ),
+                      Text(
+                        '',
+                        style: TextStyle(fontSize: 14, color: Colors.white),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-
             Column(
               children: [
                 ListTile(
                   leading: Icon(Icons.home_outlined),
                   title: Text('New Chat'),
-                  onTap: (){
+                  onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => HomePage()),);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => HomePage()),
+                    );
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.favorite_border),
                   title: Text('Favourites'),
-                  onTap: (){
+                  onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => CustomLoader()),);
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(builder: (context) => CustomLoader()),
+                    // );
                   },
                 ),
                 ListTile(
                   leading: Icon(Icons.workspaces),
                   title: Text('Workflow'),
-                  onTap: (){},
+                  onTap: () {},
                 ),
                 ListTile(
                   leading: Icon(Icons.update),
                   title: Text('History'),
-                  onTap: (){},
+                  onTap: () {},
                 ),
-                const Divider(color: Colors.black45,),
+                const Divider(
+                  color: Colors.black45,
+                ),
                 ListTile(
                   leading: Icon(Icons.account_tree_outlined),
                   title: Text('Plugins'),
-                  onTap: (){},
+                  onTap: () {},
                 ),
                 ListTile(
                   leading: Icon(Icons.notifications_outlined),
                   title: Text('Notifications'),
-                  onTap: (){},
+                  onTap: () {},
                 ),
               ],
             )
@@ -284,7 +300,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _builtUI(){
+  Widget _chatUI() {
     return Column(
       children: [
         Expanded(
@@ -315,7 +331,8 @@ class _HomePageState extends State<HomePage> {
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                       children: [
-                        if (message.medias != null && message.medias!.isNotEmpty)
+                        if (message.medias != null &&
+                            message.medias!.isNotEmpty)
                           Image.file(
                             File(message.medias!.first.url),
                             height: 150,
@@ -332,11 +349,24 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
+                   // icon: const Icon(Icons.volume_up),
+                      // onPressed: () {
+                      //   _readAloud(message.text);
+                      // },
                   if (message.user.id == geminiUser.id)
                     IconButton(
-                      icon: const Icon(Icons.volume_up),
+                      icon: _isGenerating
+                          ? const Icon(Icons.volume_off)
+                          : const Icon(Icons.volume_up),
                       onPressed: () {
-                        _readAloud(message.text);
+                        if (_isGenerating) {
+                          flutterTts.stop();
+                          setState(() {
+                            _isGenerating = false;
+                          });
+                        } else {
+                          _readAloud(message.text);
+                        }
                       },
                     ),
                 ],
@@ -344,13 +374,12 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
-
-        _buildInputField(),
+        _textFieldUI(),
       ],
     );
   }
 
-  Widget _buildInputField() {
+  Widget _textFieldUI() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Row(
@@ -377,51 +406,60 @@ class _HomePageState extends State<HomePage> {
                       onChanged: (text) {
                         setState(() {});
                       },
-                      onSubmitted: (text) {
-                        if (text.isNotEmpty) {
-                          _sendMessage(ChatMessage(
-                            user: currentUser,
-                            createdAt: DateTime.now(),
-                            text: text,
-                          ));
-                          controller.clear();
-                        }
-                      },
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         hintText: "Enter text",
                       ),
                     ),
                   ),
-                  VerticalDivider(color: Colors.black, width: 8),
-                  IconButton(
-                    onPressed: controller.text.isEmpty ? _listen : () {
-                      if (controller.text.isNotEmpty) {
-                        _sendMessage(ChatMessage(
-                          user: currentUser,
-                          createdAt: DateTime.now(),
-                          text: controller.text,
-                        ));
-                        controller.clear();
-                      }
+                  const VerticalDivider(color: Colors.black, width: 8),
+                  GestureDetector(
+                    onLongPressStart: (_) {
+                      _listen();
                     },
-                    icon: Icon(
-                      controller.text.isEmpty ? Icons.mic : Icons.send,
-                      color: Colors.blue,
-                      size: 22,
-                    ),
-                    constraints: BoxConstraints(),
+                    onLongPressEnd: (_) {
+                      speechToText.stop();
+                      setState(() => _isListening = false);
+                    },
+                    child: _isListening ? Waveform()
+                        // ? const Text(
+                        //     "Listening...",
+                          //   style: TextStyle(
+                          //       color: Colors.blue,
+                          //       fontSize: 22,
+                          //   ),
+                          // )
+                        : IconButton(
+                            icon: Icon(
+                              controller.text.isEmpty ? Icons.mic : Icons.send,
+                              color: Colors.blue,
+                            ),
+                            onPressed: controller.text.isEmpty
+                                ? null
+                                : () {
+                                    if (controller.text.isNotEmpty) {
+                                      _sendMessage(ChatMessage(
+                                        user: currentUser,
+                                        createdAt: DateTime.now(),
+                                        text: controller.text,
+                                      ));
+                                      controller.clear();
+                                      setState(() {});
+                                    }
+                                  },
+                            constraints: BoxConstraints(),
+                          ),
                   ),
                 ],
               ),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.headset), // Headphone icon
+            icon: const Icon(Icons.headset),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => CustomLoader()),
+                MaterialPageRoute(builder: (context) => VoiceChat()),
               );
             },
             color: Colors.blue,
@@ -431,3 +469,5 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
+

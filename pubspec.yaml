@@ -43,6 +43,8 @@ dependencies:
   speech_to_text: ^7.0.0
   permission_handler: ^11.3.1
   chat_bubbles: ^1.6.0
+  flutter_sound: ^9.16.0
+  waveform: ^0.0.1-nightly.49
 
 dev_dependencies:
   flutter_test:
