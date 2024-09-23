@@ -34,6 +34,7 @@ class _HomePageState extends State<HomePage> {
   bool _isGenerating = false;
   bool isTyping = false;
   String _text = '';
+
   ChatUser currentUser = ChatUser(id: "0", firstName: "User");
   ChatUser geminiUser = ChatUser(
     id: "1",
@@ -145,15 +146,16 @@ class _HomePageState extends State<HomePage> {
               _text = result.recognizedWords;
             });
             print('Speech recognized: $_text');
-            if (result.finalResult) {
-              ChatMessage chatMessage = ChatMessage(
-                user: currentUser,
-                createdAt: DateTime.now(),
-                text: _text,
-              );
-              _sendMessage(chatMessage);
-              setState(() => _isListening = false);
-            }
+            controller.text = _text;
+            // if (result.finalResult) {
+            //   ChatMessage chatMessage = ChatMessage(
+            //     user: currentUser,
+            //     createdAt: DateTime.now(),
+            //     text: _text,
+            //   );
+            //    _sendMessage(chatMessage);
+            setState(() => _isListening = false);
+            // }
           },
         );
       } else {
@@ -197,104 +199,119 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        backgroundColor: Colors.black87,
         drawer: _drawerUI(),
         appBar: AppBar(
+          leading: Builder(builder: (BuildContext context) {
+            return IconButton(
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+                icon: const Icon(Icons.vertical_split_outlined));
+          }),
           title: const Text('Ask Gemini'),
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 24),
-          backgroundColor: Colors.blue.shade100,
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 22),
+          backgroundColor: Colors.black,
+          iconTheme: IconThemeData(color: Colors.white),
         ),
         body: _chatUI());
   }
 
   Widget _drawerUI() {
     return Drawer(
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Material(
-              color: Colors.blue.shade100,
-              child: InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  //   Navigator.push(context, MaterialPageRoute(builder: (context) => UserProfile()),);
-                },
-                child: Container(
-                  padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top, bottom: 24),
-                  child: const Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 52,
-                        backgroundImage: NetworkImage(
-                            "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"),
-                      ),
-                      SizedBox(
-                        height: 12,
-                      ),
-                      Text(
-                        'Ask Gemini',
-                        style: TextStyle(fontSize: 28, color: Colors.white),
-                      ),
-                      Text(
-                        '',
-                        style: TextStyle(fontSize: 14, color: Colors.white),
-                      ),
-                    ],
+      child: Container(
+        color: Colors.black87,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              /* Material(
+                color: Colors.black, // Set the background color to blue for the header
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding: EdgeInsets.only(
+                        top: MediaQuery.of(context).padding.top, bottom: 24),
+                    child: const Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 52,
+                          backgroundImage: NetworkImage(
+                              "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"),
+                        ),
+                        SizedBox(
+                          height: 12,
+                        ),
+                        Text(
+                          'Ask Gemini',
+                          style: TextStyle(fontSize: 28, color: Colors.white),
+                        ),
+                        Text(
+                          '',
+                          style: TextStyle(fontSize: 14, color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+              ),*/
+              SizedBox(height: 44),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9.0),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                height: 37,
+                child: TextField(
+                  controller: controller,
+                  style: const TextStyle(
+                    color: Colors.white,
+                  ),
+                  cursorColor: Colors.white,
+                  textCapitalization: TextCapitalization.sentences,
+                  onChanged: (text) {
+                    setState(() {});
+                  },
+                  decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: "Search",
+                      hintStyle: TextStyle(
+                        color: Colors.grey
+                      ),
+                      suffixIcon: Icon(
+                        Icons.search,
+                        color: Colors.white60,
+                      )),
+                ),
               ),
-            ),
-            Column(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.home_outlined),
-                  title: Text('New Chat'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => HomePage()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.favorite_border),
-                  title: Text('Favourites'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(builder: (context) => CustomLoader()),
-                    // );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.workspaces),
-                  title: Text('Workflow'),
-                  onTap: () {},
-                ),
-                ListTile(
-                  leading: Icon(Icons.update),
-                  title: Text('History'),
-                  onTap: () {},
-                ),
-                const Divider(
-                  color: Colors.black45,
-                ),
-                ListTile(
-                  leading: Icon(Icons.account_tree_outlined),
-                  title: Text('Plugins'),
-                  onTap: () {},
-                ),
-                ListTile(
-                  leading: Icon(Icons.notifications_outlined),
-                  title: Text('Notifications'),
-                  onTap: () {},
-                ),
-              ],
-            )
-          ],
+              Column(
+                children: [
+                  ListTile(
+                    leading: Icon(Icons.home_outlined, color: Colors.white),
+                    title:
+                        Text('New Chat', style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => HomePage()),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.update, color: Colors.white),
+                    title:
+                        Text('History', style: TextStyle(color: Colors.white)),
+                    onTap: () {},
+                  ),
+                  const Divider(color: Colors.white),
+                ],
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -341,23 +358,30 @@ class _HomePageState extends State<HomePage> {
                           ),
                         BubbleNormal(
                           text: message.text,
+                          textStyle: TextStyle(color: Colors.white),
                           isSender: message.user.id == currentUser.id,
                           color: message.user.id == currentUser.id
-                              ? Colors.blue.shade100
-                              : Colors.grey.shade200,
+                              ? Colors.grey.shade800
+                              : Colors.black45,
                         ),
                       ],
                     ),
                   ),
-                   // icon: const Icon(Icons.volume_up),
-                      // onPressed: () {
-                      //   _readAloud(message.text);
-                      // },
+                  // icon: const Icon(Icons.volume_up),
+                  // onPressed: () {
+                  //   _readAloud(message.text);
+                  // },
                   if (message.user.id == geminiUser.id)
                     IconButton(
                       icon: _isGenerating
-                          ? const Icon(Icons.volume_off)
-                          : const Icon(Icons.volume_up),
+                          ? const Icon(
+                              Icons.volume_off,
+                              color: Colors.white60,
+                            )
+                          : const Icon(
+                              Icons.volume_up,
+                              color: Colors.white60,
+                            ),
                       onPressed: () {
                         if (_isGenerating) {
                           flutterTts.stop();
@@ -388,7 +412,7 @@ class _HomePageState extends State<HomePage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 1.0),
               decoration: BoxDecoration(
-                color: Colors.grey[200],
+                color: Colors.grey.shade900,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -396,12 +420,14 @@ class _HomePageState extends State<HomePage> {
                   IconButton(
                     icon: const Icon(Icons.photo),
                     onPressed: _sendMediaMessage,
-                    color: Colors.blue,
+                    color: Colors.white,
                     constraints: BoxConstraints(),
                   ),
                   Expanded(
                     child: TextField(
                       controller: controller,
+                      cursorColor: Colors.white,
+                      style: TextStyle(color: Colors.white),
                       textCapitalization: TextCapitalization.sentences,
                       onChanged: (text) {
                         setState(() {});
@@ -421,18 +447,19 @@ class _HomePageState extends State<HomePage> {
                       speechToText.stop();
                       setState(() => _isListening = false);
                     },
-                    child: _isListening ? Waveform()
+                    child: _isListening
+                        ? Waveform()
                         // ? const Text(
                         //     "Listening...",
-                          //   style: TextStyle(
-                          //       color: Colors.blue,
-                          //       fontSize: 22,
-                          //   ),
-                          // )
+                        //   style: TextStyle(
+                        //       color: Colors.blue,
+                        //       fontSize: 22,
+                        //   ),
+                        // )
                         : IconButton(
                             icon: Icon(
                               controller.text.isEmpty ? Icons.mic : Icons.send,
-                              color: Colors.blue,
+                              color: Colors.white,
                             ),
                             onPressed: controller.text.isEmpty
                                 ? null
@@ -462,12 +489,10 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (context) => VoiceChat()),
               );
             },
-            color: Colors.blue,
+            color: Colors.white,
           ),
         ],
       ),
     );
   }
 }
-
-

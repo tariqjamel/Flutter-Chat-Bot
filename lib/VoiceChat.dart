@@ -1,17 +1,16 @@
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
-
 import 'package:flutter_gemini/flutter_gemini.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-class CustomLoader extends StatefulWidget {
+class VoiceChat extends StatefulWidget {
   @override
-  _CustomLoaderState createState() => _CustomLoaderState();
+  _VoiceChatState createState() => _VoiceChatState();
 }
 
-class _CustomLoaderState extends State<CustomLoader>
+class _VoiceChatState extends State<VoiceChat>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   final Gemini gemini = Gemini.instance;
@@ -120,7 +119,10 @@ class _CustomLoaderState extends State<CustomLoader>
         setState(() {
           isGenerating = false;
           _isListening = true;
+          _text = '';  // Reset the text
         });
+
+        // Start listening
         speechToText.listen(
           onResult: (result) {
             setState(() {
@@ -134,10 +136,20 @@ class _CustomLoaderState extends State<CustomLoader>
                 text: _text,
               );
               _sendMessage(chatMessage);
-               setState(() => _isListening = false);
+              setState(() => _isListening = false);
             }
           },
         );
+
+        // Add a timeout to stop listening if there's no input
+        Future.delayed(Duration(seconds: 5), () {
+          if (_text.isEmpty && _isListening) {
+            speechToText.stop();
+            setState(() {
+              _isListening = false;
+            });
+          }
+        });
       } else {
         print('Speech recognition not available');
       }
@@ -146,6 +158,7 @@ class _CustomLoaderState extends State<CustomLoader>
       setState(() => _isListening = false);
     }
   }
+
 
   void _stopTTS() async {
     if (isGenerating) {
@@ -234,7 +247,7 @@ class _CustomLoaderState extends State<CustomLoader>
             SizedBox(width: 40),
             IconButton(
               icon: Icon(Icons.mic, color: Colors.green),
-              onPressed: !_isListening || !isGenerating ? _listen : null,
+              onPressed: !_isListening && !isGenerating ? _listen : null,
               tooltip: 'Start Listening',
               iconSize: 28,
             ),
