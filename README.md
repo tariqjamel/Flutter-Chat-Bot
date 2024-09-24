@@ -2,8 +2,6 @@
 
 Ask Gemini is an AI-powered chatbot application built with Flutter. It integrates speech-to-text, text-to-speech, and image-based interaction features to allow users to communicate with a conversational AI called Gemini. Users can either type messages, speak directly, or send images to the chatbot to receive meaningful responses.
 
-![Gemini Logo](https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png)
-
 ## Features
 
 - **Text-based Chat:** Users can type questions or chat with the AI bot Gemini.
