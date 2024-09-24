@@ -22,9 +22,9 @@ The app features a **Lottie animated splash screen** that enhances the user expe
 
 ## Screenshots
 
-<img  align="left" src="home_page" width="20%" height="20%">
+<img  align="left" src="home_page.png" width="20%" height="20%">
 <img  align="left" src="drawer.png" width="20%" height="20%">
-<img  src="voicechat" width="20%" height="20%">
+<img  src="voicechat.png" width="20%" height="20%">
 
 ## Tech Stack
 
