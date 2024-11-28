@@ -225,38 +225,6 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              /* Material(
-                color: Colors.black, // Set the background color to blue for the header
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                  child: Container(
-                    padding: EdgeInsets.only(
-                        top: MediaQuery.of(context).padding.top, bottom: 24),
-                    child: const Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 52,
-                          backgroundImage: NetworkImage(
-                              "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png"),
-                        ),
-                        SizedBox(
-                          height: 12,
-                        ),
-                        Text(
-                          'Ask Gemini',
-                          style: TextStyle(fontSize: 28, color: Colors.white),
-                        ),
-                        Text(
-                          '',
-                          style: TextStyle(fontSize: 14, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),*/
               SizedBox(height: 44),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9.0),
@@ -367,10 +335,6 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  // icon: const Icon(Icons.volume_up),
-                  // onPressed: () {
-                  //   _readAloud(message.text);
-                  // },
                   if (message.user.id == geminiUser.id)
                     IconButton(
                       icon: _isGenerating
@@ -449,13 +413,6 @@ class _HomePageState extends State<HomePage> {
                     },
                     child: _isListening
                         ? Waveform()
-                        // ? const Text(
-                        //     "Listening...",
-                        //   style: TextStyle(
-                        //       color: Colors.blue,
-                        //       fontSize: 22,
-                        //   ),
-                        // )
                         : IconButton(
                             icon: Icon(
                               controller.text.isEmpty ? Icons.mic : Icons.send,
