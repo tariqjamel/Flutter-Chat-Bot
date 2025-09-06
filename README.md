@@ -1,6 +1,6 @@
-# Ask Gemini - A Flutter AI Chat Application
+# A Flutter AI Chat Application
 
-Ask Gemini is an AI-powered chatbot application built with Flutter. It integrates speech-to-text, text-to-speech, and image-based interaction features to allow users to communicate with a conversational AI called Gemini. Users can either type messages, speak directly, or send images to the chatbot to receive meaningful responses.
+This is an AI-powered chatbot application built with Flutter. It integrates speech-to-text, text-to-speech, and image-based interaction features to allow users to communicate with a conversational AI called Gemini. Users can either type messages, speak directly, or send images to the chatbot to receive meaningful responses.
 
 ## Features
 
