@@ -1,4 +1,4 @@
-# Flutter AI Chat Application (Premium Glassmorphism)
+# Flutter-Chat-Bot Application (Premium Glassmorphism)
 
 This is a premium, AI-powered chatbot application built with Flutter. It features a stunning **Glassmorphic UI** and integrates Gemini AI for a seamless conversational experience using text, voice, and images.
 
