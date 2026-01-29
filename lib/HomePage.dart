@@ -1,30 +1,35 @@
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:chat_bubbles/bubbles/bubble_normal.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gemini/flutter_gemini.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import 'VoiceChat.dart';
-import 'Waveform.dart';
+import 'styles.dart';
+import 'ModernDrawer.dart';
+import 'HistoryManager.dart';
+import 'GeminiService.dart';
+import 'components/ChatBubble.dart';
+import 'components/ChatInput.dart';
+import 'components/AppGlassContainer.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final ChatSession? session;
+  const HomePage({super.key, this.session});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final Gemini gemini = Gemini.instance;
   FlutterTts flutterTts = FlutterTts();
   List<ChatMessage> messages = [];
+  String? _currentSessionId;
 
   final ScrollController scrollController = ScrollController();
   final TextEditingController controller = TextEditingController();
@@ -33,7 +38,7 @@ class _HomePageState extends State<HomePage> {
   bool _isListening = false;
   bool _isGenerating = false;
   bool isTyping = false;
-  String _text = '';
+  String? _selectedImagePath;
 
   ChatUser currentUser = ChatUser(id: "0", firstName: "User");
   ChatUser geminiUser = ChatUser(
@@ -55,15 +60,25 @@ class _HomePageState extends State<HomePage> {
     flutterTts.setSpeechRate(0.5);
 
     flutterTts.setCompletionHandler(() {
-      setState(() {
-        _isGenerating = false;
-      });
+      if (mounted) setState(() => _isGenerating = false);
     });
+
+    if (widget.session != null) {
+      messages = widget.session!.messages;
+      _currentSessionId = widget.session!.id;
+    }
+
+    controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
     flutterTts.stop();
+    controller.removeListener(_onTextChanged);
     controller.dispose();
     super.dispose();
   }
@@ -88,7 +103,9 @@ class _HomePageState extends State<HomePage> {
   void _sendMessage(ChatMessage chatMessage) {
     setState(() {
       messages = [chatMessage, ...messages];
+      isTyping = true;
     });
+
     try {
       String question = chatMessage.text;
       List<Uint8List>? images;
@@ -97,69 +114,77 @@ class _HomePageState extends State<HomePage> {
           File(chatMessage.medias!.first.url).readAsBytesSync(),
         ];
       }
-      gemini
-          .streamGenerateContent(
-        question,
-        images: images,
-      )
-          .listen((event) async {
-        ChatMessage? lastMessage = messages.firstOrNull;
+
+      GeminiService.streamChat(question, images: images).listen((event) {
+        if (!mounted) return;
+        
         String response = event.content?.parts?.fold(
                 "", (previous, current) => "$previous ${current.text}") ??
             "";
-        if (lastMessage != null && lastMessage.user == geminiUser) {
-          lastMessage = messages.removeAt(0);
-          lastMessage.text += response;
-          setState(() {
-            messages = [lastMessage!, ...messages];
-          });
-        } else {
-          ChatMessage message = ChatMessage(
-            user: geminiUser,
-            createdAt: DateTime.now(),
-            text: response,
-          );
-          setState(() {
-            messages = [message, ...messages];
-          });
-        }
 
-        // await flutterTts.speak(response);
+        setState(() {
+          isTyping = false;
+          ChatMessage? lastMessage = messages.firstOrNull;
+          if (lastMessage != null && lastMessage.user == geminiUser) {
+            // Update the existing Gemini response bubble
+            messages.removeAt(0);
+            String updatedText = lastMessage.text + response;
+            messages = [
+              ChatMessage(
+                user: geminiUser,
+                createdAt: lastMessage.createdAt,
+                text: updatedText,
+              ),
+              ...messages
+            ];
+          } else {
+            // Create a new response bubble
+            ChatMessage message = ChatMessage(
+              user: geminiUser,
+              createdAt: DateTime.now(),
+              text: response,
+            );
+            messages = [message, ...messages];
+          }
+        });
+        _persistSession();
+      }, onDone: () {
+        if (mounted) {
+          setState(() => isTyping = false);
+          _persistSession();
+        }
       });
     } catch (e) {
       print(e);
+      if (mounted) setState(() => isTyping = false);
     }
+  }
+
+  void _persistSession() {
+    if (messages.isEmpty) return;
+    _currentSessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+    String title = messages.last.text;
+    if (title.length > 30) title = "${title.substring(0, 30)}...";
+    
+    HistoryManager.saveSession(ChatSession(
+      id: _currentSessionId!,
+      title: title,
+      messages: messages,
+    ));
   }
 
   void _listen() async {
     if (!_isListening) {
-      bool available = await speechToText.initialize(
-        onStatus: (status) => print('Status: $status'),
-        onError: (error) => print('Error: $error'),
-      );
+      bool available = await speechToText.initialize();
       if (available) {
-        print('Starting to listen...');
         setState(() => _isListening = true);
         speechToText.listen(
           onResult: (result) {
             setState(() {
-              _text = result.recognizedWords;
+              controller.text = result.recognizedWords;
             });
-            print('Speech recognized: $_text');
-            controller.text = _text;
-            // if (result.finalResult) {
-            //   ChatMessage chatMessage = ChatMessage(
-            //     user: currentUser,
-            //     createdAt: DateTime.now(),
-            //     text: _text,
-            //   );
-            //    _sendMessage(chatMessage);
-            setState(() => _isListening = false);
-            // }
           },
         );
-      } else {
-        print('Speech recognition not available');
       }
     } else {
       speechToText.stop();
@@ -169,118 +194,79 @@ class _HomePageState extends State<HomePage> {
 
   void _sendMediaMessage() async {
     ImagePicker picker = ImagePicker();
-    XFile? file = await picker.pickImage(
-      source: ImageSource.gallery,
-    );
+    XFile? file = await picker.pickImage(source: ImageSource.gallery);
     if (file != null) {
-      ChatMessage chatMessage = ChatMessage(
-        user: currentUser,
-        createdAt: DateTime.now(),
-        text: "Describe this picture?",
-        medias: [
-          ChatMedia(
-            url: file.path,
-            fileName: "",
-            type: MediaType.image,
-          )
-        ],
-      );
-      _sendMessage(chatMessage);
+      setState(() => _selectedImagePath = file.path);
     }
   }
 
   void _readAloud(String message) async {
     await flutterTts.speak(message);
-    setState(() {
-      _isGenerating = true;
-    });
+    setState(() => _isGenerating = true);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        backgroundColor: Colors.black87,
-        drawer: _drawerUI(),
-        appBar: AppBar(
-          leading: Builder(builder: (BuildContext context) {
-            return IconButton(
-                onPressed: () {
-                  Scaffold.of(context).openDrawer();
-                },
-                icon: const Icon(Icons.vertical_split_outlined));
-          }),
-          title: const Text('Ask Gemini'),
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 22),
-          backgroundColor: Colors.black,
-          iconTheme: IconThemeData(color: Colors.white),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        drawer: ModernDrawer(),
+        body: Stack(
+          children: [
+            Positioned.fill(child: Container(color: Colors.black)),
+            SafeArea(
+              child: Stack(
+                children: [
+                  _chatUI(),
+                  _topToolbar(),
+                ],
+              ),
+            ),
+          ],
         ),
-        body: _chatUI());
+      ),
+    );
   }
 
-  Widget _drawerUI() {
-    return Drawer(
-      child: Container(
-        color: Colors.black87,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(height: 44),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9.0),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade800,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                height: 37,
-                child: TextField(
-                  controller: controller,
-                  style: const TextStyle(
-                    color: Colors.white,
-                  ),
-                  cursorColor: Colors.white,
-                  textCapitalization: TextCapitalization.sentences,
-                  onChanged: (text) {
-                    setState(() {});
-                  },
-                  decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: "Search",
-                      hintStyle: TextStyle(
-                        color: Colors.grey
-                      ),
-                      suffixIcon: Icon(
-                        Icons.search,
-                        color: Colors.white60,
-                      )),
-                ),
+  Widget _topToolbar() {
+    return Positioned(
+      top: 10,
+      left: 10,
+      right: 10,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Builder(builder: (context) {
+            return IconButton(
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              icon: AppGlassContainer(
+                width: 40,
+                height: 40,
+                borderRadius: 50,
+                child: const Icon(Icons.menu_rounded, color: Colors.white70, size: 24),
               ),
-              Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.home_outlined, color: Colors.white),
-                    title:
-                        Text('New Chat', style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => HomePage()),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.update, color: Colors.white),
-                    title:
-                        Text('History', style: TextStyle(color: Colors.white)),
-                    onTap: () {},
-                  ),
-                  const Divider(color: Colors.white),
-                ],
-              )
-            ],
+            );
+          }),
+          IconButton(
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (c) => const HomePage()),
+              );
+            },
+            icon: AppGlassContainer(
+              width: 40,
+              height: 40,
+              borderRadius: 50,
+              child: const Icon(Icons.add_rounded, color: Colors.white70, size: 24),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -293,160 +279,108 @@ class _HomePageState extends State<HomePage> {
             controller: scrollController,
             itemCount: messages.length + (isTyping ? 1 : 0),
             reverse: true,
+            padding: const EdgeInsets.fromLTRB(8, 70, 8, 10),
             itemBuilder: (context, index) {
               if (index == 0 && isTyping) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    BubbleNormal(
-                      text: "Typing...",
-                      isSender: false,
-                      color: Colors.grey,
-                    ),
-                  ],
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: ChatBubble(text: "Typing...", isSender: false),
                 );
               }
               final message = messages[index - (isTyping ? 1 : 0)];
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: message.user.id == currentUser.id
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        if (message.medias != null &&
-                            message.medias!.isNotEmpty)
-                          Image.file(
-                            File(message.medias!.first.url),
-                            height: 150,
-                            width: 150,
-                            fit: BoxFit.cover,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Column(
+                  crossAxisAlignment: message.user.id == currentUser.id
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    if (message.medias != null && message.medias!.isNotEmpty)
+                      _imageMessage(message.medias!.first.url),
+                    
+                    ChatBubble(
+                      text: message.text,
+                      isSender: message.user.id == currentUser.id,
+                      actions: message.user.id == geminiUser.id ? [
+                        IconButton(
+                          icon: Icon(
+                            _isGenerating ? Icons.volume_off : Icons.volume_up,
+                            color: Colors.white38,
+                            size: 18,
                           ),
-                        BubbleNormal(
-                          text: message.text,
-                          textStyle: TextStyle(color: Colors.white),
-                          isSender: message.user.id == currentUser.id,
-                          color: message.user.id == currentUser.id
-                              ? Colors.grey.shade800
-                              : Colors.black45,
-                        ),
-                      ],
+                          onPressed: () => _isGenerating ? flutterTts.stop() : _readAloud(message.text),
+                        )
+                      ] : null,
                     ),
-                  ),
-                  if (message.user.id == geminiUser.id)
-                    IconButton(
-                      icon: _isGenerating
-                          ? const Icon(
-                              Icons.volume_off,
-                              color: Colors.white60,
-                            )
-                          : const Icon(
-                              Icons.volume_up,
-                              color: Colors.white60,
-                            ),
-                      onPressed: () {
-                        if (_isGenerating) {
-                          flutterTts.stop();
-                          setState(() {
-                            _isGenerating = false;
-                          });
-                        } else {
-                          _readAloud(message.text);
-                        }
-                      },
-                    ),
-                ],
+                  ],
+                ),
               );
             },
           ),
         ),
-        _textFieldUI(),
+        if (_selectedImagePath != null) _buildImagePreview(),
+        ChatInput(
+          controller: controller,
+          isEmpty: controller.text.isEmpty && _selectedImagePath == null,
+          isListening: _isListening,
+          onSend: () {
+             if (controller.text.isNotEmpty || _selectedImagePath != null) {
+                _sendMessage(ChatMessage(
+                  user: currentUser,
+                  createdAt: DateTime.now(),
+                  text: controller.text.isEmpty ? "Describe this picture?" : controller.text,
+                  medias: _selectedImagePath != null ? [
+                    ChatMedia(url: _selectedImagePath!, fileName: "", type: MediaType.image)
+                  ] : null,
+                ));
+                controller.clear();
+                setState(() => _selectedImagePath = null);
+              }
+          },
+          onMedia: _sendMediaMessage,
+          onVoiceMode: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VoiceChat())),
+          onListen: _listen,
+          onStopListen: () {
+            speechToText.stop();
+            setState(() => _isListening = false);
+          },
+        ),
       ],
     );
   }
 
-  Widget _textFieldUI() {
+  Widget _imageMessage(String url) {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.file(File(url), height: 180, width: 180, fit: BoxFit.cover),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      padding: const EdgeInsets.all(6),
+      decoration: AppStyles.glassDecoration(radius: 12),
+      child: Stack(
         children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 1.0),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade900,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.photo),
-                    onPressed: _sendMediaMessage,
-                    color: Colors.white,
-                    constraints: BoxConstraints(),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      cursorColor: Colors.white,
-                      style: TextStyle(color: Colors.white),
-                      textCapitalization: TextCapitalization.sentences,
-                      onChanged: (text) {
-                        setState(() {});
-                      },
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: "Enter text",
-                      ),
-                    ),
-                  ),
-                  const VerticalDivider(color: Colors.black, width: 8),
-                  GestureDetector(
-                    onLongPressStart: (_) {
-                      _listen();
-                    },
-                    onLongPressEnd: (_) {
-                      speechToText.stop();
-                      setState(() => _isListening = false);
-                    },
-                    child: _isListening
-                        ? Waveform()
-                        : IconButton(
-                            icon: Icon(
-                              controller.text.isEmpty ? Icons.mic : Icons.send,
-                              color: Colors.white,
-                            ),
-                            onPressed: controller.text.isEmpty
-                                ? null
-                                : () {
-                                    if (controller.text.isNotEmpty) {
-                                      _sendMessage(ChatMessage(
-                                        user: currentUser,
-                                        createdAt: DateTime.now(),
-                                        text: controller.text,
-                                      ));
-                                      controller.clear();
-                                      setState(() {});
-                                    }
-                                  },
-                            constraints: BoxConstraints(),
-                          ),
-                  ),
-                ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(File(_selectedImagePath!), height: 100, width: 100, fit: BoxFit.cover),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedImagePath = null),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close, size: 16, color: Colors.white),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.headset),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => VoiceChat()),
-              );
-            },
-            color: Colors.white,
           ),
         ],
       ),

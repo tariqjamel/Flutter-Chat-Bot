@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 class Waveform extends StatefulWidget {
+  const Waveform({super.key});
+
   @override
-  _WaveformState createState() => _WaveformState();
+  State<Waveform> createState() => _WaveformState();
 }
 
 class _WaveformState extends State<Waveform> with TickerProviderStateMixin {
@@ -20,10 +22,10 @@ class _WaveformState extends State<Waveform> with TickerProviderStateMixin {
 class BouncingCircle extends StatefulWidget {
   final int delay;
 
-  BouncingCircle({required this.delay});
+  const BouncingCircle({super.key, required this.delay});
 
   @override
-  _BouncingCircleState createState() => _BouncingCircleState();
+  State<BouncingCircle> createState() => _BouncingCircleState();
 }
 
 class _BouncingCircleState extends State<BouncingCircle>

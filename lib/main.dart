@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_chatbot/SplashScreen.dart';
-import 'package:flutter_chatbot/const.dart';
+import 'package:flutter/services.dart';
+
+import 'SplashScreen.dart';
+import 'const.dart';
 import 'package:flutter_gemini/flutter_gemini.dart';
 
-import 'HomePage.dart';
 
 void main(){
-  Gemini.init(apiKey: GEMINI_API_KEY);
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+  ));
+  Gemini.init(
+    apiKey: GEMINI_API_KEY,
+  );
   runApp(MyApp());
 }
 

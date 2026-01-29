@@ -1,33 +1,33 @@
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:flutter/material.dart';
-import 'dart:math';
-import 'package:flutter_gemini/flutter_gemini.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'styles.dart';
+import 'GeminiService.dart';
+import 'components/AnimatedOrb.dart';
 
 class VoiceChat extends StatefulWidget {
+  const VoiceChat({super.key});
+
   @override
-  _VoiceChatState createState() => _VoiceChatState();
+  State<VoiceChat> createState() => _VoiceChatState();
 }
 
-class _VoiceChatState extends State<VoiceChat>
-    with TickerProviderStateMixin {
+class _VoiceChatState extends State<VoiceChat> with TickerProviderStateMixin {
   late AnimationController _controller;
-  final Gemini gemini = Gemini.instance;
   FlutterTts flutterTts = FlutterTts();
   List<ChatMessage> messages = [];
 
   late stt.SpeechToText speechToText;
   bool _isListening = false;
-  bool isTyping = false;
   bool isGenerating = false;
   String _text = '';
   ChatUser currentUser = ChatUser(id: "0", firstName: "User");
   ChatUser geminiUser = ChatUser(
     id: "1",
     firstName: "Gemini",
-    profileImage:
-    "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png",
+    profileImage: "https://seeklogo.com/images/G/google-gemini-logo-A5787B2669-seeklogo.com.png",
   );
 
   @override
@@ -50,21 +50,14 @@ class _VoiceChatState extends State<VoiceChat>
   void _sendMessage(ChatMessage chatMessage) {
     setState(() {
       messages = [chatMessage, ...messages];
+      isGenerating = true;
     });
 
     try {
       String question = chatMessage.text;
       StringBuffer responseBuffer = StringBuffer();
 
-      setState(() {
-        isGenerating = true;
-      });
-
-      gemini
-          .streamGenerateContent(
-        question,
-      )
-          .listen((event) async {
+      GeminiService.streamChat(question).listen((event) {
         String responsePart = event.content?.parts?.fold(
             "", (previous, current) => "$previous ${current.text}") ?? "";
 
@@ -92,73 +85,57 @@ class _VoiceChatState extends State<VoiceChat>
         String finalResponse = responseBuffer.toString();
         await flutterTts.speak(finalResponse);
 
-        // setState(() {
-        //   isGenerating = false;
-        // });
-
         flutterTts.setCompletionHandler(() {
-          // setState(() {
-          //   isGenerating = false;
-          // });
-          _listen();
+          if (mounted) {
+            setState(() => isGenerating = false);
+            _listen();
+          }
         });
       });
     } catch (e) {
       print(e);
+      if (mounted) setState(() => isGenerating = false);
     }
   }
 
   void _listen() async {
     if (!_isListening) {
-      bool available = await speechToText.initialize(
-        onStatus: (status) => print('Status: $status'),
-        onError: (error) => print('Error: $error'),
-      );
+      bool available = await speechToText.initialize();
       if (available) {
-        print('Starting to listen...');
         setState(() {
           isGenerating = false;
           _isListening = true;
-          _text = '';  // Reset the text
+          _text = '';
         });
 
-        // Start listening
         speechToText.listen(
           onResult: (result) {
             setState(() {
               _text = result.recognizedWords;
             });
-            print('Speech recognized: $_text');
             if (result.finalResult) {
-              ChatMessage chatMessage = ChatMessage(
+              _sendMessage(ChatMessage(
                 user: currentUser,
                 createdAt: DateTime.now(),
                 text: _text,
-              );
-              _sendMessage(chatMessage);
+              ));
               setState(() => _isListening = false);
             }
           },
         );
 
-        // Add a timeout to stop listening if there's no input
-        Future.delayed(Duration(seconds: 5), () {
+        Future.delayed(const Duration(seconds: 5), () {
           if (_text.isEmpty && _isListening) {
             speechToText.stop();
-            setState(() {
-              _isListening = false;
-            });
+            if (mounted) setState(() => _isListening = false);
           }
         });
-      } else {
-        print('Speech recognition not available');
       }
     } else {
       speechToText.stop();
       setState(() => _isListening = false);
     }
   }
-
 
   void _stopTTS() async {
     if (isGenerating) {
@@ -169,7 +146,6 @@ class _VoiceChatState extends State<VoiceChat>
       });
     }
   }
-
 
   Future<void> _initSpeech() async {
     bool available = await speechToText.initialize(
@@ -188,128 +164,149 @@ class _VoiceChatState extends State<VoiceChat>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            Positioned.fill(child: Container(color: Colors.black)),
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildHeader(),
+
+                  /// MAIN CENTER CONTENT (slightly down)
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment(0, 0.2), // 👈 move DOWN (0 = center)
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildStatusText(),
+                          const SizedBox(height: 10),
+                          _buildRecognizedText(),
+                          const SizedBox(height: 40),
+                          AnimatedOrb(
+                            controller: _controller,
+                            isListening: _isListening,
+                            isGenerating: isGenerating,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _buildModernControls(),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Row(
+        children: [
+          Container(
+            decoration: AppStyles.glassDecoration(radius: 50),
+            child: IconButton(
+              icon: const Icon(Icons.close_rounded, color: Colors.white70),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: AppStyles.glassDecoration(radius: 20),
+            child: Text("VOICE MODE", style: AppStyles.secondaryStyle.copyWith(letterSpacing: 1.2)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusText() {
+    return Text(
+      _isListening ? 'LISTENING' : (isGenerating ? 'GEMINI IS THINKING' : 'TAP MIC TO START'),
+      style: AppStyles.headingStyle.copyWith(
+        fontSize: 14,
+        letterSpacing: 2,
+        color: _isListening ? AppStyles.primaryColor : Colors.white38,
+      ),
+    );
+  }
+
+  Widget _buildRecognizedText() {
+    return Text(
+      _text.isEmpty ? "Speak to Gemini" : '"$_text"',
+      textAlign: TextAlign.center,
+      style: AppStyles.bodyStyle.copyWith(
+        fontSize: 18,
+        fontStyle: FontStyle.italic,
+        color: Colors.white70,
+      ),
+    );
+  }
+
+  Widget _buildModernControls() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SizedBox(height: 40),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            IconButton(
-              icon: Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
-                // Handle the back action, e.g., Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              tooltip: 'Back',
-            ),
-          ],
+        _buildCircularActionButton(
+          icon: Icons.stop_rounded,
+          color: Colors.redAccent.withOpacity(0.2),
+          iconColor: Colors.redAccent,
+          onTap: isGenerating ? _stopTTS : null,
+          isActive: isGenerating,
         ),
-
-        SizedBox(height: 240),
-        Text(
-          _isListening ? 'Listening...' : (isGenerating ? 'Generating...' : ''),
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-              color: Colors.white,
-              decoration: TextDecoration.none
-          ),
+        const SizedBox(width: 40),
+        _buildCircularActionButton(
+          icon: _isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
+          color: AppStyles.primaryColor.withOpacity(0.2),
+          iconColor: AppStyles.primaryColor,
+          onTap: !isGenerating ? _listen : null,
+          isActive: true,
+          size: 80,
+          innerIconSize: 35,
         ),
-        SizedBox(height: 20),
-
-        SizedBox(
-          width: 250,
-          height: 250,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Box(0.8, 0.8, 4, _controller, Colors.grey.withOpacity(0.2)),
-              Box(0.6, 0.6, 3, _controller, Colors.grey.withOpacity(0.4)),
-              Box(0.4, 0.4, 2, _controller, Colors.grey.withOpacity(0.6)),
-              Box(0.2, 0.2, 1, _controller, Colors.grey.withOpacity(0.8)),
-              Box(0.1, 0.1, 0, _controller, Colors.grey),
-              LogoBox(_controller),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 80),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: Icon(Icons.stop, color: Colors.red),
-              onPressed: isGenerating  ? _stopTTS : null,
-              tooltip: 'Stop',
-              iconSize: 28,
-            ),
-            SizedBox(width: 40),
-            IconButton(
-              icon: Icon(Icons.mic, color: Colors.green),
-              onPressed: !_isListening && !isGenerating ? _listen : null,
-              tooltip: 'Start Listening',
-              iconSize: 28,
-            ),
-          ],
-        )
       ],
     );
   }
-}
 
-class Box extends StatelessWidget {
-  final double scaleFactor;
-  final double borderFactor;
-  final int delay;
-  final AnimationController controller;
-  final Color borderColor;
-
-  Box(this.scaleFactor, this.borderFactor, this.delay, this.controller,
-      this.borderColor);
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        double animationValue =
-            sin((controller.value + delay * 0.2) * pi * 2) * 0.15 + 1.0;
-        return Transform.scale(
-          scale: animationValue,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: borderColor,
-                width: 2,
-              ),
-            ),
-            width: 250 * scaleFactor,
-            height: 250 * scaleFactor,
-          ),
-        );
-      },
-    );
-  }
-}
-
-class LogoBox extends StatelessWidget {
-  final AnimationController controller;
-
-  LogoBox(this.controller);
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        return Icon(
-          Icons.music_note, // Replace with your desired icon or SVG.
-          color: controller.value < 0.5 ? Colors.grey : Colors.white,
-          size: 80,
-        );
-      },
+  Widget _buildCircularActionButton({
+    required IconData icon,
+    required Color color,
+    required Color iconColor,
+    required VoidCallback? onTap,
+    required bool isActive,
+    double size = 60,
+    double innerIconSize = 24,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: isActive ? color : Colors.white12,
+          shape: BoxShape.circle,
+          border: Border.all(color: isActive ? iconColor.withOpacity(0.4) : Colors.transparent),
+          boxShadow: isActive ? [
+            BoxShadow(color: iconColor.withOpacity(0.3), blurRadius: 15, spreadRadius: 2)
+          ] : [],
+        ),
+        child: Icon(icon, color: isActive ? iconColor : Colors.white24, size: innerIconSize),
+      ),
     );
   }
 }
